@@ -1,4 +1,4 @@
-import test
+import test::foo
 fn foo
 
 12.34
@@ -8,3 +8,5 @@ fn foo
 
 "abc\"123\t45\\"
 "abc"
+
+if4

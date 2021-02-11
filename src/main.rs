@@ -59,6 +59,15 @@ pub mod lexer {
                         self.input = &self.input[1..];
                     }
                     // symbols and stuff
+                    b':' => {
+                        if self.input[1] == b':' {
+                            self.tokens.push(Token::Symbol(Symbol::DoubleColon));
+                            self.input = &self.input[2..];
+                        } else {
+                            self.tokens.push(Token::Symbol(Symbol::Colon));
+                            self.input = &self.input[1..];
+                        }
+                    }
                     _ => panic!(),
                 }
             }
