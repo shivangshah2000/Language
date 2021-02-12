@@ -139,7 +139,6 @@ impl<'a> Lexer<'a> {
         Ok(token)
     }
 
-    // TODO
     fn lex_string(&mut self) -> Result<Token<'a>, LexError> {
         assert_eq!(self.input.first(), Some(&b'"'));
         self.input = &self.input[1..];
@@ -203,7 +202,6 @@ impl<'a> Lexer<'a> {
         Ok(token)
     }
 
-    // TODO
     fn lex_character(&mut self) -> Result<Token<'a>, LexError> {
         assert_eq!(self.input.first(), Some(&b'\''));
         let pos = Position {
