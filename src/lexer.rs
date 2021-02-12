@@ -207,6 +207,7 @@ pub enum Literal<'a> {
     Char(char),
 }
 
+#[allow(unused)] // remove when symbols are going to be parsed
 #[derive(Debug)]
 pub enum Symbol {
     DoubleColon,
