@@ -43,23 +43,16 @@ impl<'a> Lexer<'a> {
                 b'\n' => {
                     self.cur_line += 1;
                     self.cur_col = 1;
-                    self.input = &self.input[1..];
+                    self.advance(1);
                 }
                 c if c.is_ascii_whitespace() => {
                     self.cur_col += 1;
-                    self.input = &self.input[1..];
+                    self.advance(1);
                 }
-                // symbols and stuff
-                // b':' => {
-                //     if self.input[1] == b':' {
-                //         self.tokens.push(Token::Symbol(Symbol::DoubleColon));
-                //         self.input = &self.input[2..];
-                //     } else {
-                //         self.tokens.push(Token::Symbol(Symbol::Colon));
-                //         self.input = &self.input[1..];
-                //     }
-                // }
-                _ => panic!(),
+                _ => {
+                    let token = self.try_lex_symbol()?;
+                    self.tokens.push(token);
+                }
             }
         }
         Ok(())
@@ -79,7 +72,7 @@ impl<'a> Lexer<'a> {
             })
             .unwrap_or(self.input.len());
         let word = std::str::from_utf8(&self.input[..idx]).unwrap();
-        self.input = &self.input[idx..];
+        self.advance(idx);
         let pos = Position {
             line: self.cur_line,
             col: self.cur_col,
@@ -122,7 +115,7 @@ impl<'a> Lexer<'a> {
             })
             .unwrap_or(self.input.len());
         let num = std::str::from_utf8(&self.input[..idx]).unwrap();
-        self.input = &self.input[idx..];
+        self.advance(idx);
         let pos = Position {
             line: self.cur_line,
             col: self.cur_col,
@@ -141,7 +134,7 @@ impl<'a> Lexer<'a> {
 
     fn lex_string(&mut self) -> Result<Token<'a>, LexError> {
         assert_eq!(self.input.first(), Some(&b'"'));
-        self.input = &self.input[1..];
+        self.advance(1);
         let mut idx = 0;
         let mut newlines = 0;
         let mut new_col = self.cur_col + 1;
@@ -208,10 +201,10 @@ impl<'a> Lexer<'a> {
             line: self.cur_line,
             col: self.cur_col,
         };
-        self.input = &self.input[1..];
+        self.advance(1);
         self.cur_col += 3; // "'" character "'"
         let character = if let Some(b'\\') = self.input.first() {
-            self.input = &self.input[1..];
+            self.advance(1);
             self.cur_col += 1;
             match self.input.first() {
                 Some(b'\'') => '\'',
@@ -226,15 +219,42 @@ impl<'a> Lexer<'a> {
         } else {
             return Err(LexError {});
         };
-        self.input = &self.input[1..];
+        self.advance(1);
         if let Some(b'\'') = self.input.first() {
-            self.input = &self.input[1..];
+            self.advance(1);
         } else {
             return Err(LexError {});
         }
         let token = Kind::Literal(Literal::Char(character));
         let token = Token { pos, kind: token };
         Ok(token)
+    }
+
+    fn try_lex_symbol(&mut self) -> Result<Token<'a>, LexError> {
+        let pos = Position {
+            col: self.cur_col,
+            line: self.cur_line,
+        };
+        let ch = self.input[0];
+        self.cur_col += 1;
+        self.advance(1);
+        let token = match ch {
+            b'[' => Kind::Symbol(Symbol::LeftSquareBracket),
+            b']' => Kind::Symbol(Symbol::RightSquareBracket),
+            b'(' => Kind::Symbol(Symbol::LeftParam),
+            b')' => Kind::Symbol(Symbol::RightParam),
+            b'{' => Kind::Symbol(Symbol::LeftBrace),
+            b'}' => Kind::Symbol(Symbol::RightBrace),
+            b';' => Kind::Symbol(Symbol::SemiColon),
+            b'.' => Kind::Symbol(Symbol::Dot),
+            b',' => Kind::Symbol(Symbol::Comma),
+            _ => return Err(LexError {}),
+        };
+        Ok(Token { pos, kind: token })
+    }
+
+    fn advance(&mut self, by: usize) {
+        self.input = &self.input[by..];
     }
 }
 
@@ -256,7 +276,6 @@ pub struct Token<'a> {
 #[derive(Debug)]
 pub enum Kind<'a> {
     Literal(Literal<'a>),
-    #[allow(unused)]
     Symbol(Symbol),
     Identifier(Ident<'a>),
     Keyword(Keyword),
@@ -273,24 +292,42 @@ pub enum Literal<'a> {
 #[allow(unused)] // remove when symbols are going to be parsed
 #[derive(Debug)]
 pub enum Symbol {
-    DoubleColon,
-    SemiColon,
-    LeftBrace,
-    RightBrace,
-    LeftParam,
-    RightParam,
-    Plus,
-    Minus,
-    Cross,
-    LeftSlash,
-    RghtSlash,
-    Colon,
-    Dot,
-    Comma,
-    DoubleEqual,
-    Equal,
-    PlusEqual,
-    MinusEqual,
+    Colon,              // :
+    DoubleColon,        // ::
+    SemiColon,          // ;
+    LeftBrace,          // {
+    RightBrace,         // }
+    LeftParam,          // (
+    RightParam,         // )
+    LeftSquareBracket,  // [
+    RightSquareBracket, // ]
+    Plus,               // +
+    Minus,              // -
+    Star,               // *
+    Slash,              // /
+    PlusEqual,          // +=
+    MinusEqual,         // -=
+    StarEqual,          // *=
+    SlashEqual,         // /=
+    Pipe,               // |
+    DoublePipe,         // ||
+    Ampersand,          // &
+    DoubleAmpersand,    // &&
+    Caret,              // ^
+    CaretEqual,         // ^=
+    PipeEqual,          // |=
+    AmpersandEqual,     // &=
+    LessThan,           // <
+    GreaterThan,        // >
+    LessThanEqual,      // <=
+    GreaterThanEqual,   // >=
+    Bang,               // !
+    BangEqual,          // !=
+    Dot,                // .
+    BackSlash,          // \
+    Comma,              // ,
+    DoubleEqual,        // ==
+    Equal,              // =
 }
 
 #[derive(Debug)]

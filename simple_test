@@ -1,5 +1,11 @@
-import test foo
-fn foo
+import test foo;
+fn foo() {
+    return "<html>
+    <body>
+        Multi line!
+    </body>
+</html>";
+}
 
 12.34
 -1
