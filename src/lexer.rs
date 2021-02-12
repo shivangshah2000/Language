@@ -80,6 +80,11 @@ impl<'a> Lexer<'a> {
             .unwrap_or(self.input.len());
         let word = std::str::from_utf8(&self.input[..idx]).unwrap();
         self.input = &self.input[idx..];
+        let pos = Position {
+            line: self.cur_line,
+            col: self.cur_col,
+        };
+        self.cur_col += idx;
         let token = match word {
             "import" => Kind::Keyword(Keyword::Import),
             "struct" => Kind::Keyword(Keyword::Struct),
@@ -99,12 +104,7 @@ impl<'a> Lexer<'a> {
             "print" => Kind::Keyword(Keyword::Print),
             _ => Kind::Identifier(Ident { name: word }),
         };
-        let token = Token {
-            line: self.cur_line,
-            col: self.cur_col,
-            kind: token,
-        };
-        self.cur_col += idx;
+        let token = Token { pos, kind: token };
         Ok(token)
     }
 
@@ -123,6 +123,11 @@ impl<'a> Lexer<'a> {
             .unwrap_or(self.input.len());
         let num = std::str::from_utf8(&self.input[..idx]).unwrap();
         self.input = &self.input[idx..];
+        let pos = Position {
+            line: self.cur_line,
+            col: self.cur_col,
+        };
+        self.cur_col += idx;
         let token = if let Ok(num) = num.parse::<i64>() {
             Kind::Literal(Literal::Int(num))
         } else if let Ok(num) = num.parse::<f64>() {
@@ -130,34 +135,48 @@ impl<'a> Lexer<'a> {
         } else {
             return Err(LexError {});
         };
-        let token = Token {
-            line: self.cur_line,
-            col: self.cur_col,
-            kind: token,
-        };
-        self.cur_col += idx;
+        let token = Token { pos, kind: token };
         Ok(token)
     }
 
+    // TODO
     fn lex_string(&mut self) -> Result<Token<'a>, LexError> {
         assert_eq!(self.input.first(), Some(&b'"'));
         self.input = &self.input[1..];
-        let mut idx = 1;
+        let mut idx = 0;
+        let mut newlines = 0;
+        let mut new_col = self.cur_col + 1;
         let mut escaped = false;
         while idx < self.input.len() {
             if self.input[idx] == b'"' {
+                new_col += 1;
                 break;
             } else if self.input[idx] == b'\\' {
                 idx += 1;
+                new_col += 1;
                 match self.input[idx] {
                     b'\\' | b'"' | b't' | b'n' | b'r' => escaped = true, // add more escape codes
                     _ => return Err(LexError {}),
                 }
+            } else if self.input[idx] == b'\n' {
+                newlines += 1;
+                new_col = 0;
             }
             idx += 1;
+            new_col += 1;
         }
         let word = std::str::from_utf8(&self.input[..idx]).unwrap();
+        if idx == self.input.len() {
+            return Err(LexError {});
+        }
         self.input = &self.input[idx + 1..]; // ignore the closing quote
+        let pos = Position {
+            line: self.cur_line,
+            col: self.cur_col,
+        };
+        self.cur_col = new_col;
+        self.cur_line += newlines; // multiline strings are allowed
+
         let token = if !escaped {
             Kind::Literal(Literal::String(Cow::Borrowed(word)))
         } else {
@@ -180,20 +199,22 @@ impl<'a> Lexer<'a> {
             }
             Kind::Literal(Literal::String(Cow::Owned(s)))
         };
-        let token = Token {
-            line: self.cur_line,
-            col: self.cur_col,
-            kind: token,
-        };
-        self.cur_col += idx + 2; // 2 is from the surrounding quotes
+        let token = Token { pos, kind: token };
         Ok(token)
     }
 
+    // TODO
     fn lex_character(&mut self) -> Result<Token<'a>, LexError> {
         assert_eq!(self.input.first(), Some(&b'\''));
+        let pos = Position {
+            line: self.cur_line,
+            col: self.cur_col,
+        };
         self.input = &self.input[1..];
+        self.cur_col += 3; // "'" character "'"
         let character = if let Some(b'\\') = self.input.first() {
             self.input = &self.input[1..];
+            self.cur_col += 1;
             match self.input.first() {
                 Some(b'\'') => '\'',
                 Some(b'\\') => '\\',
@@ -214,11 +235,7 @@ impl<'a> Lexer<'a> {
             return Err(LexError {});
         }
         let token = Kind::Literal(Literal::Char(character));
-        let token = Token {
-            line: self.cur_line,
-            col: self.cur_col,
-            kind: token,
-        };
+        let token = Token { pos, kind: token };
         Ok(token)
     }
 }
@@ -227,15 +244,21 @@ impl<'a> Lexer<'a> {
 pub struct LexError {}
 
 #[derive(Debug)]
-pub struct Token<'a> {
+pub struct Position {
     line: usize,
     col: usize,
+}
+
+#[derive(Debug)]
+pub struct Token<'a> {
+    pos: Position,
     kind: Kind<'a>,
 }
 
 #[derive(Debug)]
 pub enum Kind<'a> {
     Literal(Literal<'a>),
+    #[allow(unused)]
     Symbol(Symbol),
     Identifier(Ident<'a>),
     Keyword(Keyword),
