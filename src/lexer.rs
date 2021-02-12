@@ -32,6 +32,10 @@ impl<'a> Lexer<'a> {
                     let token = self.lex_string()?;
                     self.tokens.push(token);
                 }
+                b'\'' => {
+                    let token = self.lex_character()?;
+                    self.tokens.push(token);
+                }
                 c if c.is_ascii_whitespace() => {
                     self.input = &self.input[1..];
                 }
@@ -154,6 +158,33 @@ impl<'a> Lexer<'a> {
             Token::Literal(Literal::String(Cow::Owned(s)))
         };
         Ok(token)
+    }
+
+    fn lex_character(&mut self) -> Result<Token<'a>, LexError> {
+        assert_eq!(self.input.first(), Some(&b'\''));
+        self.input = &self.input[1..];
+        let character = if let Some(b'\\') = self.input.first() {
+            self.input = &self.input[1..];
+            match self.input.first() {
+                Some(b'\'') => '\'',
+                Some(b'\\') => '\\',
+                Some(b't') => '\t',
+                Some(b'n') => '\n',
+                Some(b'r') => '\r',
+                _ => return Err(LexError {}),
+            }
+        } else if let Some(&c) = self.input.first() {
+            c as char
+        } else {
+            return Err(LexError {});
+        };
+        self.input = &self.input[1..];
+        if let Some(b'\'') = self.input.first() {
+            self.input = &self.input[1..];
+        } else {
+            return Err(LexError {});
+        }
+        Ok(Token::Literal(Literal::Char(character)))
     }
 }
 
