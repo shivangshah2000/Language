@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 
 pub struct Lexer<'a> {
+    cur_line: usize,
+    cur_col: usize,
     input: &'a [u8],
     tokens: Vec<Token<'a>>,
 }
@@ -8,6 +10,8 @@ pub struct Lexer<'a> {
 impl<'a> Lexer<'a> {
     pub fn new(input: &'a [u8]) -> Self {
         Self {
+            cur_line: 1,
+            cur_col: 1,
             input,
             tokens: vec![],
         }
@@ -36,19 +40,25 @@ impl<'a> Lexer<'a> {
                     let token = self.lex_character()?;
                     self.tokens.push(token);
                 }
+                b'\n' => {
+                    self.cur_line += 1;
+                    self.cur_col = 1;
+                    self.input = &self.input[1..];
+                }
                 c if c.is_ascii_whitespace() => {
+                    self.cur_col += 1;
                     self.input = &self.input[1..];
                 }
                 // symbols and stuff
-                b':' => {
-                    if self.input[1] == b':' {
-                        self.tokens.push(Token::Symbol(Symbol::DoubleColon));
-                        self.input = &self.input[2..];
-                    } else {
-                        self.tokens.push(Token::Symbol(Symbol::Colon));
-                        self.input = &self.input[1..];
-                    }
-                }
+                // b':' => {
+                //     if self.input[1] == b':' {
+                //         self.tokens.push(Token::Symbol(Symbol::DoubleColon));
+                //         self.input = &self.input[2..];
+                //     } else {
+                //         self.tokens.push(Token::Symbol(Symbol::Colon));
+                //         self.input = &self.input[1..];
+                //     }
+                // }
                 _ => panic!(),
             }
         }
@@ -71,24 +81,30 @@ impl<'a> Lexer<'a> {
         let word = std::str::from_utf8(&self.input[..idx]).unwrap();
         self.input = &self.input[idx..];
         let token = match word {
-            "import" => Token::Keyword(Keyword::Import),
-            "struct" => Token::Keyword(Keyword::Struct),
-            "fn" => Token::Keyword(Keyword::Fn),
-            "enum" => Token::Keyword(Keyword::Enum),
-            "mod" => Token::Keyword(Keyword::Mod),
-            "const" => Token::Keyword(Keyword::Const),
-            "let" => Token::Keyword(Keyword::Let),
-            "if" => Token::Keyword(Keyword::If),
-            "else" => Token::Keyword(Keyword::Else),
-            "for" => Token::Keyword(Keyword::For),
-            "in" => Token::Keyword(Keyword::In),
-            "while" => Token::Keyword(Keyword::While),
-            "return" => Token::Keyword(Keyword::Return),
-            "break" => Token::Keyword(Keyword::Break),
-            "continue" => Token::Keyword(Keyword::Continue),
-            "print" => Token::Keyword(Keyword::Print),
-            _ => Token::Identifier(Ident { name: word }),
+            "import" => Kind::Keyword(Keyword::Import),
+            "struct" => Kind::Keyword(Keyword::Struct),
+            "fn" => Kind::Keyword(Keyword::Fn),
+            "enum" => Kind::Keyword(Keyword::Enum),
+            "mod" => Kind::Keyword(Keyword::Mod),
+            "const" => Kind::Keyword(Keyword::Const),
+            "let" => Kind::Keyword(Keyword::Let),
+            "if" => Kind::Keyword(Keyword::If),
+            "else" => Kind::Keyword(Keyword::Else),
+            "for" => Kind::Keyword(Keyword::For),
+            "in" => Kind::Keyword(Keyword::In),
+            "while" => Kind::Keyword(Keyword::While),
+            "return" => Kind::Keyword(Keyword::Return),
+            "break" => Kind::Keyword(Keyword::Break),
+            "continue" => Kind::Keyword(Keyword::Continue),
+            "print" => Kind::Keyword(Keyword::Print),
+            _ => Kind::Identifier(Ident { name: word }),
         };
+        let token = Token {
+            line: self.cur_line,
+            col: self.cur_col,
+            kind: token,
+        };
+        self.cur_col += idx;
         Ok(token)
     }
 
@@ -107,13 +123,20 @@ impl<'a> Lexer<'a> {
             .unwrap_or(self.input.len());
         let num = std::str::from_utf8(&self.input[..idx]).unwrap();
         self.input = &self.input[idx..];
-        if let Ok(num) = num.parse::<i64>() {
-            Ok(Token::Literal(Literal::Int(num)))
+        let token = if let Ok(num) = num.parse::<i64>() {
+            Kind::Literal(Literal::Int(num))
         } else if let Ok(num) = num.parse::<f64>() {
-            Ok(Token::Literal(Literal::Float(num)))
+            Kind::Literal(Literal::Float(num))
         } else {
-            Err(LexError {})
-        }
+            return Err(LexError {});
+        };
+        let token = Token {
+            line: self.cur_line,
+            col: self.cur_col,
+            kind: token,
+        };
+        self.cur_col += idx;
+        Ok(token)
     }
 
     fn lex_string(&mut self) -> Result<Token<'a>, LexError> {
@@ -136,7 +159,7 @@ impl<'a> Lexer<'a> {
         let word = std::str::from_utf8(&self.input[..idx]).unwrap();
         self.input = &self.input[idx + 1..]; // ignore the closing quote
         let token = if !escaped {
-            Token::Literal(Literal::String(Cow::Borrowed(word)))
+            Kind::Literal(Literal::String(Cow::Borrowed(word)))
         } else {
             let mut s = String::with_capacity(3 * word.len() / 4);
             let mut chars = word.chars();
@@ -155,8 +178,14 @@ impl<'a> Lexer<'a> {
                 }
                 s.push(c);
             }
-            Token::Literal(Literal::String(Cow::Owned(s)))
+            Kind::Literal(Literal::String(Cow::Owned(s)))
         };
+        let token = Token {
+            line: self.cur_line,
+            col: self.cur_col,
+            kind: token,
+        };
+        self.cur_col += idx + 2; // 2 is from the surrounding quotes
         Ok(token)
     }
 
@@ -184,7 +213,13 @@ impl<'a> Lexer<'a> {
         } else {
             return Err(LexError {});
         }
-        Ok(Token::Literal(Literal::Char(character)))
+        let token = Kind::Literal(Literal::Char(character));
+        let token = Token {
+            line: self.cur_line,
+            col: self.cur_col,
+            kind: token,
+        };
+        Ok(token)
     }
 }
 
@@ -192,7 +227,14 @@ impl<'a> Lexer<'a> {
 pub struct LexError {}
 
 #[derive(Debug)]
-pub enum Token<'a> {
+pub struct Token<'a> {
+    line: usize,
+    col: usize,
+    kind: Kind<'a>,
+}
+
+#[derive(Debug)]
+pub enum Kind<'a> {
     Literal(Literal<'a>),
     Symbol(Symbol),
     Identifier(Ident<'a>),

@@ -1,4 +1,4 @@
-import test::foo
+import test foo
 fn foo
 
 12.34
