@@ -1,4 +1,4 @@
-import test foo;
+import test:: foo;
 fn foo() {
     return "<html>
     <body>
@@ -8,9 +8,10 @@ fn foo() {
 }
 
 12.34
--1
 -5.e5
--4.6
+
+
+a += b -12.6+5.8;
 
 "abc\"123\t45\\"
 "abc" 'a' '\\' '\'''\r'

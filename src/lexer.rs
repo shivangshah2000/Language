@@ -22,13 +22,13 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn lex(&mut self) -> Result<(), LexError> {
-        while let Some(&ch) = self.input.first() {
+        while let Some(ch) = self.peek() {
             match ch {
                 b'a'..=b'z' | b'A'..=b'Z' | b'_' => {
                     let token = self.lex_word()?;
                     self.tokens.push(token);
                 }
-                b'0'..=b'9' | b'-' => {
+                b'0'..=b'9' => {
                     let token = self.lex_number()?;
                     self.tokens.push(token);
                 }
@@ -133,7 +133,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn lex_string(&mut self) -> Result<Token<'a>, LexError> {
-        assert_eq!(self.input.first(), Some(&b'"'));
+        assert_eq!(self.peek(), Some(b'"'));
         self.advance(1);
         let mut idx = 0;
         let mut newlines = 0;
@@ -196,17 +196,17 @@ impl<'a> Lexer<'a> {
     }
 
     fn lex_character(&mut self) -> Result<Token<'a>, LexError> {
-        assert_eq!(self.input.first(), Some(&b'\''));
+        assert_eq!(self.peek(), Some(b'\''));
         let pos = Position {
             line: self.cur_line,
             col: self.cur_col,
         };
         self.advance(1);
         self.cur_col += 3; // "'" character "'"
-        let character = if let Some(b'\\') = self.input.first() {
+        let character = if let Some(b'\\') = self.peek() {
             self.advance(1);
             self.cur_col += 1;
-            match self.input.first() {
+            match self.peek() {
                 Some(b'\'') => '\'',
                 Some(b'\\') => '\\',
                 Some(b't') => '\t',
@@ -214,13 +214,13 @@ impl<'a> Lexer<'a> {
                 Some(b'r') => '\r',
                 _ => return Err(LexError {}),
             }
-        } else if let Some(&c) = self.input.first() {
+        } else if let Some(c) = self.peek() {
             c as char
         } else {
             return Err(LexError {});
         };
         self.advance(1);
-        if let Some(b'\'') = self.input.first() {
+        if let Some(b'\'') = self.peek() {
             self.advance(1);
         } else {
             return Err(LexError {});
@@ -236,8 +236,6 @@ impl<'a> Lexer<'a> {
             line: self.cur_line,
         };
         let ch = self.input[0];
-        self.cur_col += 1;
-        self.advance(1);
         let token = match ch {
             b'[' => Kind::Symbol(Symbol::LeftSquareBracket),
             b']' => Kind::Symbol(Symbol::RightSquareBracket),
@@ -248,13 +246,142 @@ impl<'a> Lexer<'a> {
             b';' => Kind::Symbol(Symbol::SemiColon),
             b'.' => Kind::Symbol(Symbol::Dot),
             b',' => Kind::Symbol(Symbol::Comma),
+            b':' => {
+                if let Some(b':') = self.peek_next() {
+                    self.advance(1);
+                    Kind::Symbol(Symbol::DoubleColon)
+                } else {
+                    Kind::Symbol(Symbol::Colon)
+                }
+            }
+            b'+' => {
+                if let Some(b'=') = self.peek_next() {
+                    self.advance(1);
+                    Kind::Symbol(Symbol::PlusEqual)
+                } else {
+                    Kind::Symbol(Symbol::Plus)
+                }
+            }
+            b'-' => {
+                if let Some(b'=') = self.peek_next() {
+                    self.advance(1);
+                    Kind::Symbol(Symbol::MinusEqual)
+                } else {
+                    Kind::Symbol(Symbol::Minus)
+                }
+            }
+            b'*' => {
+                if let Some(b'=') = self.peek_next() {
+                    self.advance(1);
+                    Kind::Symbol(Symbol::StarEqual)
+                } else {
+                    Kind::Symbol(Symbol::Star)
+                }
+            }
+            b'/' => {
+                if let Some(b'=') = self.peek_next() {
+                    self.advance(1);
+                    Kind::Symbol(Symbol::SlashEqual)
+                } else {
+                    Kind::Symbol(Symbol::Slash)
+                }
+            }
+            b'>' => {
+                if let Some(b'=') = self.peek_next() {
+                    self.advance(1);
+                    Kind::Symbol(Symbol::GreaterThanEqual)
+                } else if let Some(b'>') = self.peek_next() {
+                    self.advance(1);
+                    if let Some(b'=') = self.peek_next() {
+                        self.advance(1);
+                        Kind::Symbol(Symbol::ShrEqual)
+                    } else {
+                        Kind::Symbol(Symbol::Shr)
+                    }
+                } else {
+                    Kind::Symbol(Symbol::GreaterThan)
+                }
+            }
+            b'<' => {
+                if let Some(b'=') = self.peek_next() {
+                    self.advance(1);
+                    Kind::Symbol(Symbol::LessThanEqual)
+                } else if let Some(b'<') = self.peek_next() {
+                    self.advance(1);
+                    if let Some(b'=') = self.peek_next() {
+                        self.advance(1);
+                        Kind::Symbol(Symbol::ShlEqual)
+                    } else {
+                        Kind::Symbol(Symbol::Shl)
+                    }
+                } else {
+                    Kind::Symbol(Symbol::LessThan)
+                }
+            }
+            b'|' => {
+                if let Some(b'|') = self.peek_next() {
+                    self.advance(1);
+                    Kind::Symbol(Symbol::DoublePipe)
+                } else if let Some(b'=') = self.peek_next() {
+                    self.advance(1);
+                    Kind::Symbol(Symbol::PipeEqual)
+                } else {
+                    Kind::Symbol(Symbol::Pipe)
+                }
+            }
+            b'&' => {
+                if let Some(b'&') = self.peek_next() {
+                    self.advance(1);
+                    Kind::Symbol(Symbol::DoubleAmpersand)
+                } else if let Some(b'=') = self.peek_next() {
+                    self.advance(1);
+                    Kind::Symbol(Symbol::AmpersandEqual)
+                } else {
+                    Kind::Symbol(Symbol::Ampersand)
+                }
+            }
+            b'^' => {
+                if let Some(b'=') = self.peek_next() {
+                    self.advance(1);
+                    Kind::Symbol(Symbol::CaretEqual)
+                } else {
+                    Kind::Symbol(Symbol::Caret)
+                }
+            }
+            b'=' => {
+                if let Some(b'=') = self.peek_next() {
+                    self.advance(1);
+                    Kind::Symbol(Symbol::DoubleEqual)
+                } else {
+                    Kind::Symbol(Symbol::Equal)
+                }
+            }
+            b'\\' => Kind::Symbol(Symbol::BackSlash),
+            b'!' => {
+                if let Some(b'=') = self.peek_next() {
+                    self.advance(1);
+                    Kind::Symbol(Symbol::BangEqual)
+                } else {
+                    Kind::Symbol(Symbol::Bang)
+                }
+            }
             _ => return Err(LexError {}),
         };
+        self.cur_col += 1;
+        self.advance(1);
         Ok(Token { pos, kind: token })
     }
 
     fn advance(&mut self, by: usize) {
         self.input = &self.input[by..];
+    }
+
+    fn peek(&self) -> Option<u8> {
+        self.input.first().copied()
+    }
+
+    fn peek_next(&self) -> Option<u8> {
+        self.input.get(1).copied()
     }
 }
 
@@ -289,7 +416,6 @@ pub enum Literal<'a> {
     Char(char),
 }
 
-#[allow(unused)] // remove when symbols are going to be parsed
 #[derive(Debug)]
 pub enum Symbol {
     Colon,              // :
@@ -321,6 +447,10 @@ pub enum Symbol {
     GreaterThan,        // >
     LessThanEqual,      // <=
     GreaterThanEqual,   // >=
+    Shr,                // >>
+    Shl,                // <<
+    ShrEqual,           // >>=
+    ShlEqual,           // <<=
     Bang,               // !
     BangEqual,          // !=
     Dot,                // .
