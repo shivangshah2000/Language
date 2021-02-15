@@ -1,19 +1,18 @@
-import test:: foo;
-fn foo() {
-    return "<html>
-    <body>
-        Multi line!
-    </body>
-</html>";
+import std::borrow::Cow;
+
+mod lexer {
+    struct Lexer {
+        input: &[u8],
+        tokens: VecToken,
+    }
+
+    fn new_lexer(input: &[u8]) -> Self {
+        Self {
+            input: input, tokens: VecToken::new()
+        }
+    }
+
+    fn lex(&mut self) -> VecToken {
+        
+    }
 }
-
-12.34
--5.e5
-
-
-a += b -12.6+5.8;
-
-"abc\"123\t45\\"
-"abc" 'a' '\\' '\'''\r'
-
-if4

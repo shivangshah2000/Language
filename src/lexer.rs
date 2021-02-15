@@ -249,6 +249,7 @@ impl<'a> Lexer<'a> {
             b':' => {
                 if let Some(b':') = self.peek_next() {
                     self.advance(1);
+                    self.cur_col += 1;
                     Kind::Symbol(Symbol::DoubleColon)
                 } else {
                     Kind::Symbol(Symbol::Colon)
@@ -257,6 +258,7 @@ impl<'a> Lexer<'a> {
             b'+' => {
                 if let Some(b'=') = self.peek_next() {
                     self.advance(1);
+                    self.cur_col += 1;
                     Kind::Symbol(Symbol::PlusEqual)
                 } else {
                     Kind::Symbol(Symbol::Plus)
@@ -265,7 +267,12 @@ impl<'a> Lexer<'a> {
             b'-' => {
                 if let Some(b'=') = self.peek_next() {
                     self.advance(1);
+                    self.cur_col += 1;
                     Kind::Symbol(Symbol::MinusEqual)
+                } else if let Some(b'>') = self.peek_next() {
+                    self.advance(1);
+                    self.cur_col += 1;
+                    Kind::Symbol(Symbol::Arrow)
                 } else {
                     Kind::Symbol(Symbol::Minus)
                 }
@@ -273,6 +280,7 @@ impl<'a> Lexer<'a> {
             b'*' => {
                 if let Some(b'=') = self.peek_next() {
                     self.advance(1);
+                    self.cur_col += 1;
                     Kind::Symbol(Symbol::StarEqual)
                 } else {
                     Kind::Symbol(Symbol::Star)
@@ -281,6 +289,7 @@ impl<'a> Lexer<'a> {
             b'/' => {
                 if let Some(b'=') = self.peek_next() {
                     self.advance(1);
+                    self.cur_col += 1;
                     Kind::Symbol(Symbol::SlashEqual)
                 } else {
                     Kind::Symbol(Symbol::Slash)
@@ -289,11 +298,14 @@ impl<'a> Lexer<'a> {
             b'>' => {
                 if let Some(b'=') = self.peek_next() {
                     self.advance(1);
+                    self.cur_col += 1;
                     Kind::Symbol(Symbol::GreaterThanEqual)
                 } else if let Some(b'>') = self.peek_next() {
                     self.advance(1);
+                    self.cur_col += 1;
                     if let Some(b'=') = self.peek_next() {
                         self.advance(1);
+                        self.cur_col += 1;
                         Kind::Symbol(Symbol::ShrEqual)
                     } else {
                         Kind::Symbol(Symbol::Shr)
@@ -305,11 +317,14 @@ impl<'a> Lexer<'a> {
             b'<' => {
                 if let Some(b'=') = self.peek_next() {
                     self.advance(1);
+                    self.cur_col += 1;
                     Kind::Symbol(Symbol::LessThanEqual)
                 } else if let Some(b'<') = self.peek_next() {
                     self.advance(1);
+                    self.cur_col += 1;
                     if let Some(b'=') = self.peek_next() {
                         self.advance(1);
+                        self.cur_col += 1;
                         Kind::Symbol(Symbol::ShlEqual)
                     } else {
                         Kind::Symbol(Symbol::Shl)
@@ -321,9 +336,11 @@ impl<'a> Lexer<'a> {
             b'|' => {
                 if let Some(b'|') = self.peek_next() {
                     self.advance(1);
+                    self.cur_col += 1;
                     Kind::Symbol(Symbol::DoublePipe)
                 } else if let Some(b'=') = self.peek_next() {
                     self.advance(1);
+                    self.cur_col += 1;
                     Kind::Symbol(Symbol::PipeEqual)
                 } else {
                     Kind::Symbol(Symbol::Pipe)
@@ -332,9 +349,11 @@ impl<'a> Lexer<'a> {
             b'&' => {
                 if let Some(b'&') = self.peek_next() {
                     self.advance(1);
+                    self.cur_col += 1;
                     Kind::Symbol(Symbol::DoubleAmpersand)
                 } else if let Some(b'=') = self.peek_next() {
                     self.advance(1);
+                    self.cur_col += 1;
                     Kind::Symbol(Symbol::AmpersandEqual)
                 } else {
                     Kind::Symbol(Symbol::Ampersand)
@@ -343,6 +362,7 @@ impl<'a> Lexer<'a> {
             b'^' => {
                 if let Some(b'=') = self.peek_next() {
                     self.advance(1);
+                    self.cur_col += 1;
                     Kind::Symbol(Symbol::CaretEqual)
                 } else {
                     Kind::Symbol(Symbol::Caret)
@@ -351,7 +371,12 @@ impl<'a> Lexer<'a> {
             b'=' => {
                 if let Some(b'=') = self.peek_next() {
                     self.advance(1);
+                    self.cur_col += 1;
                     Kind::Symbol(Symbol::DoubleEqual)
+                } else if let Some(b'>') = self.peek_next() {
+                    self.advance(1);
+                    self.cur_col += 1;
+                    Kind::Symbol(Symbol::FatArrow)
                 } else {
                     Kind::Symbol(Symbol::Equal)
                 }
@@ -360,6 +385,7 @@ impl<'a> Lexer<'a> {
             b'!' => {
                 if let Some(b'=') = self.peek_next() {
                     self.advance(1);
+                    self.cur_col += 1;
                     Kind::Symbol(Symbol::BangEqual)
                 } else {
                     Kind::Symbol(Symbol::Bang)
@@ -458,6 +484,8 @@ pub enum Symbol {
     Comma,              // ,
     DoubleEqual,        // ==
     Equal,              // =
+    Arrow,              // ->
+    FatArrow,           // =>
 }
 
 #[derive(Debug)]
